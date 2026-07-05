@@ -1,0 +1,220 @@
+﻿@model PagedList.IPagedList<ArtGallery.Models.Sale>
+@using PagedList.Mvc;
+<link href="~/Content/PagedList.css" rel="stylesheet" type="text/css" />
+
+@{
+    ViewBag.Title = "Sales";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>Sales</h2>
+
+<div id="sale-app">
+    <div>
+        @if (User.IsInRole("Admin"))
+        {
+            <button id="btnCreate" class="btn btn-success float-end mb-2">Add New Sale</button>
+        }
+    </div>
+    @using (Html.BeginForm("Index", "Sales", FormMethod.Get))
+    {
+        <p>
+            Find by name: @Html.TextBox("SearchString", ViewBag.CurrentFilter as string)
+            <input type="submit" value="Search" />
+        </p>
+    }
+
+    
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>
+                    Image
+                </th>
+
+                <th>
+                    @Html.ActionLink("Customer Name", "Index", new
+                    {
+                        sortOrder =
+                   ViewBag.ImageSortParm
+                    })
+                </th>
+                <th>
+                    @Html.ActionLink("Sale Date", "Index", new
+                        {
+                            sortOrder =
+                        ViewBag.DateSortParm
+                        })
+
+                </th>
+
+                <th>
+                    Customer Phone
+                </th>
+                <th>
+                    PayMethod
+                </th>
+                <th>
+                    Paid?
+                </th>
+                <th>
+                    TotalPrice
+                </th>
+                <th>
+                    Details
+                </th>
+                <th>
+                    Actions
+                </th>
+                <th></th>
+            </tr>
+
+        </thead>
+        <tbody id="sale-list-body">
+            @foreach (var s in Model)
+            {
+                <tr data-sale-id="@s.SaleId">
+                    <td><img src="@Url.Content("~/images/" + s.ImageUrl)" height="100" /></td>
+                    <td>@s.CustomerName</td>
+                    <td>@s.SaleDate.ToString("yyyy-MM-dd")</td>
+                    <td>@s.CustomerPhone</td>
+                    <td>@s.PayMethod.PayMethodName</td>
+                    <td>@(s.IsPaid ? "Paid" : "Not Paid")</td>
+                    <td>@s.TotalPrice</td>
+                    <td>
+                        <ul>
+                            @foreach (var m in s.SaleDetails)
+                            {
+                                <li>@m.ArtName : @m.Quantity</li>
+                            }
+                        </ul>
+                    </td>
+                    <td>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <a class="btn btn-primary btn-sm edit-btn" href="@Url.Action("EditPartial", "Sales", new { id = s.SaleId })">Edit</a>
+                            <button class="btn btn-danger btn-sm delete-btn"
+                                    data-sale-id="@s.SaleId"
+                                    data-customer-name="@s.CustomerName">
+                                Delete
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No Action</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <br />
+    Page @(Model.PageCount < Model.PageNumber ? 0 : Model.PageNumber) of
+    @Model.PageCount
+    @Html.PagedListPager(Model, page => Url.Action("Index",
+     new
+     {
+         page,
+         sortOrder = ViewBag.CurrentSort,
+         currentFilter =
+    ViewBag.CurrentFilter
+     }))
+</div>
+
+<div id="modalContainer"></div>
+
+@section scripts {
+    <script>
+    $(document).ready(function () {
+
+        $("#btnCreate").click(function () {
+            $.get('@Url.Action("CreatePartial", "Sales")', function (data) {
+                $("#modalContainer").html('<div class="modal fade show" style="display:block;" aria-modal="true" role="dialog"><div class="modal-dialog modal-lg"><div class="modal-content">' + data + '</div></div></div><div class="modal-backdrop fade show"></div>');
+                attachModalEventListeners();
+            });
+        });
+
+        $('#sale-list-body').on('click', '.edit-btn', function (e) {
+            e.preventDefault();
+            var editUrl = $(this).attr('href');
+
+            $.get(editUrl, function (data) {
+                $("#modalContainer").html('<div class="modal fade show" style="display:block;" aria-modal="true" role="dialog"><div class="modal-dialog modal-lg"><div class="modal-content">' + data + '</div></div></div><div class="modal-backdrop fade show"></div>');
+                attachModalEventListeners("Edit", $(e.currentTarget).closest('tr').data('sale-id'));
+            });
+        });
+
+        $('#sale-list-body').on('click', '.delete-btn', function () {
+            var saleId = $(this).data('sale-id');
+            var customerName = $(this).data('customer-name');
+           
+
+            if (confirm('Are you sure you want to delete ' + customerName + '?')) {
+                $.post('@Url.Action("DeleteSale", "Sales")',
+                    {
+                      id: saleId
+                    })
+                    .done(function (response) {
+                        if (response.success) {
+                            window.location.reload();
+                        } else {
+                            alert('Error deleting sale: ' + response.message);
+                        }
+                    })
+                    .fail(function () {
+                        alert('An error occurred while deleting the sale.');
+                    });
+            }
+        });
+
+        function attachModalEventListeners(action = "Create", saleId = null) {
+            $(document)
+                .off("click", ".modal-backdrop, .modal .btn-secondary")
+                .on("click", ".modal-backdrop, .modal .btn-secondary", function () {
+                    $("#modalContainer").empty();
+                });
+
+            $(document)
+                .off("submit", "#createSaleForm, #editSaleForm")
+                .on("submit", "#createSaleForm, #editSaleForm", function (e) {
+                    e.preventDefault();
+
+                    var form = $(this);
+                    var formData = new FormData(this);
+                    var url = '';
+                    if (form.attr('id') === "createSaleForm" && action === "Create") {
+                        url = '@Url.Action("CreateSale", "Sales")';
+                    }
+                    else if (form.attr('id') === "editSaleForm" && action === "Edit") {
+                        url = '@Url.Action("EditSale", "Sales")';
+                        if (saleId) {
+                            formData.append("SaleId", saleId);
+                        }
+                    }
+
+                    if (url) {
+                        $.ajax({
+                            url: url,
+                            type: 'POST',
+                            data: formData,
+                            contentType: false,
+                            processData: false,
+                            success: function (response) {
+                                if (response.success) {
+                                    $("#modalContainer").empty();
+                                    window.location.reload();
+                                } else {
+                                    $("#modalContainer .modal-content").html(response);
+                                    attachModalEventListeners(action, saleId);
+                                }
+                            },
+                            error: function () {
+                                alert("Error performing operation.");
+                            }
+                        });
+                    }
+                });
+        }
+    });
+    </script>
+}

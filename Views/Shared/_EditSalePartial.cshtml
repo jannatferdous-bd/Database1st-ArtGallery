@@ -1,0 +1,126 @@
+﻿
+@model ArtGallery.ViewModels.SaleViewModel
+<link href="~/Content/bootstrap.min.css" rel="stylesheet" />
+<div class="modal-header">
+    <h5 class="modal-title">Edit Sale</h5>
+</div>
+<div class="modal-body">
+    @using (Html.BeginForm("EditSale", "Sales", FormMethod.Post, new { id = "editSaleForm", enctype = "multipart/form-data" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <input type="hidden" name="SaleId" value="@Model.SaleId" />
+        <input type="hidden" name="OldImageUrl" value="@Model.ImageUrl" />
+        <div class="row">
+            <div class="col-md-7">
+                <h4> Sale Information</h4>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.CustomerName, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.EditorFor(model => model.CustomerName, new { htmlAttributes = new { @class = "form-control" } })
+                    @Html.ValidationMessageFor(model => model.CustomerName, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.SaleDate, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.EditorFor(model => model.SaleDate, new { htmlAttributes = new { @class = "form-control" } })
+                    @Html.ValidationMessageFor(model => model.SaleDate, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.CustomerPhone, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.EditorFor(model => model.CustomerPhone, new { htmlAttributes = new { @class = "form-control" } })
+                    @Html.ValidationMessageFor(model => model.CustomerPhone, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.IsPaid, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.EditorFor(model => model.IsPaid)
+                    @Html.ValidationMessageFor(model => model.IsPaid, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.TotalPrice, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.EditorFor(model => model.TotalPrice)
+                    @Html.ValidationMessageFor(model => model.TotalPrice, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    @Html.LabelFor(model => model.PayMethodId, htmlAttributes: new { @class = "control-label col-md-3" })
+                    @Html.DropDownListFor(model => model.PayMethodId, new SelectList(Model.PayMethods, "PayMethodId", "PayMethodName"), "Select PayMethod", new { @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.PayMethodId, "", new { @class = "text-danger" })
+                </div>
+                <div class="form-group mb-2">
+                    <img id="imageFile" src="@Url.Content("~/Images/" + Model.ImageUrl)" width="125" height="125" style="border:1px;margin-top:20px;" /><br />
+                    @Html.LabelFor(model => model.ProfileFile, htmlAttributes: new { @class = "control-label col-md-3" })
+                    <input onchange="readUrl(this)" type="file" name="ProfileFile" id="ProfileFile" class="invisible" />
+                </div>
+            </div>
+            <div class="col-md-5">
+                <h4> Edit Detail</h4>
+                <button onclick="AddDetail()" type="button" class="btn btn-warning mb-2">Add Detail</button>
+                @Html.Partial("_AddDetails", Model.SaleDetails)
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-success">Save Changes</button>
+        </div>
+    }
+</div>
+<script src="~/Scripts/jquery-3.7.1.min.js"></script>
+<script>
+    function readUrl(i) {
+        if (i.files && i.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $("#imageFile").attr('src', e.target.result)
+            }
+            reader.readAsDataURL(i.files[0]);
+        }
+    }
+    function deleteRow(btn) {
+        $(btn).closest('tr').remove();
+        updateSaleDetailIndex();
+    }
+    function AddDetail() {
+        var lastIndex = parseInt($('#HIndex').val());
+        var newRow = `<tr> <td>
+        <input type="text" name="SaleDetails[${lastIndex}].ArtName" value="" class="form-control" /></td><td>
+         <input type="text" name="SaleDetails[${lastIndex}].Quantity" value="" class="form-control" /></td><td>
+          <button type="button" class="btn btn-danger" onclick="deleteRow(this)">Delete</button>
+         </td></tr>  `;
+        $("#ExTable tbody").append(newRow);
+        $('#HIndex').val(lastIndex + 1);
+        updateSaleDetailIndex();
+    }
+    function updateSaleDetailIndex() {
+        $("#ExTable tbody tr").each(function (index) {
+            $(this).find("input[name^='SaleDetails']").each(function () {
+                var name = $(this).attr("name");
+                name = name.replace(/SaleDetails\[\d+\]/, "SaleDetails[" + index + "]");
+                $(this).attr("name", name)
+            })
+        })
+    }
+    $(document).off("submit", "#editForm").on("submit", "#editForm", function (event) {
+        event.preventDefault();
+        var formData = new FormData(this);
+        $.ajax({
+            type: "POST",
+            url: "/Sales/EditSale",
+            contentType: false,
+            processData: false,
+            data: formData,
+            success: function (response) {
+                if (response.success) {
+                    alert("Updated Successfully");
+                    $("#modalContainer").empty();
+                    window.location.reload();
+                } else {
+                    $("#modalContainer .modal-content").html(response);
+                }
+            },
+            error: function (error) {
+                alert("Error updating sale.");
+                console.error("Ajax Error:", error);
+            }
+        });
+    });
+</script>
+
+
